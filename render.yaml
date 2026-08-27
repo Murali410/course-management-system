@@ -1,0 +1,101 @@
+version: "1"
+
+services:
+  # Django REST API (Gunicorn)
+  - type: web
+    name: course-management-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    branch: main
+    healthCheckPath: /health/ready
+    autoDeploy: true
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: ENVIRONMENT
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: course-management-db
+          property: connectionString
+      - key: ALLOWED_HOSTS
+        sync: false          # set manually: your-app.onrender.com
+      - key: CORS_ALLOW_ALL_ORIGINS
+        value: "False"
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false          # set manually: https://your-app.vercel.app
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false          # set manually: https://your-app.vercel.app
+      - key: FRONTEND_BASE_URL
+        sync: false          # set manually: https://your-app.vercel.app
+      - key: SECURE_SSL_REDIRECT
+        value: "False"       # Render terminates TLS at the load balancer
+      - key: SESSION_COOKIE_SECURE
+        value: "True"
+      - key: CSRF_COOKIE_SECURE
+        value: "True"
+      - key: TRUST_PROXY_HEADERS
+        value: "True"
+      - key: USE_X_FORWARDED_HOST
+        value: "True"
+      - key: CELERY_BROKER_URL
+        sync: false          # set manually: rediss://... from Upstash
+      - key: CELERY_RESULT_BACKEND
+        sync: false          # set manually: rediss://... from Upstash
+      - key: CLOUDINARY_URL
+        sync: false          # set manually: cloudinary://key:secret@cloud
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.console.EmailBackend
+      - key: PAGE_SIZE
+        value: "20"
+      - key: APPLY_MIGRATIONS
+        value: "true"
+      - key: COLLECT_STATIC
+        value: "true"
+
+  # Celery background worker
+  - type: worker
+    name: course-management-celery
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    branch: main
+    autoDeploy: true
+    startCommand: celery -A backend worker --loglevel=INFO
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: ENVIRONMENT
+        value: production
+      - key: SECRET_KEY
+        fromService:
+          name: course-management-api
+          type: web
+          envVarKey: SECRET_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: course-management-db
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        sync: false
+      - key: CELERY_RESULT_BACKEND
+        sync: false
+      - key: CLOUDINARY_URL
+        sync: false
+      - key: ALLOWED_HOSTS
+        value: "*"
+      - key: CORS_ALLOW_ALL_ORIGINS
+        value: "False"
+      - key: APPLY_MIGRATIONS
+        value: "false"
+      - key: COLLECT_STATIC
+        value: "false"
+
+databases:
+  - name: course-management-db
+    plan: free
+    databaseName: course_management
+    user: cms_user

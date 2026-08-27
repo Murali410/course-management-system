@@ -1,0 +1,409 @@
+import AccountCircle from "@mui/icons-material/AccountCircle";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import MenuIcon from "@mui/icons-material/Menu";
+import MoreIcon from "@mui/icons-material/MoreVert";
+import { Menu, MenuItem, Select } from "@mui/material";
+import MuiAppBar, { AppBarProps as MuiAppBarProps } from "@mui/material/AppBar";
+import Box from "@mui/material/Box";
+import CssBaseline from "@mui/material/CssBaseline";
+import Divider from "@mui/material/Divider";
+import MuiDrawer from "@mui/material/Drawer";
+import IconButton from "@mui/material/IconButton";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import ListItemButton from "@mui/material/ListItemButton";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
+import Toolbar from "@mui/material/Toolbar";
+import Typography from "@mui/material/Typography";
+import { CSSObject, Theme, styled } from "@mui/material/styles";
+import * as React from "react";
+import { Outlet, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { drawerWidth } from "../../../config";
+import {
+  hasOperationalAccess,
+  isRole,
+} from "../../../constants/roles.constants";
+import { useLogoutMutation } from "../../../redux/auth/authApi";
+import { useAppSelector } from "../../../redux/hook";
+import { useGetOrganizationsQuery } from "../../../redux/organization/organizationApi";
+import ErrorDisplay from "../../ErrorDisplay/ErrorDisplay";
+import Modal from "../../Modal/Modal";
+import Calender from "../../calender/Calender";
+import { IMenu, MAIN_MENUS } from "./constants";
+
+const openedMixin = (theme: Theme): CSSObject => ({
+  width: drawerWidth,
+  transition: theme.transitions.create("width", {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.enteringScreen,
+  }),
+  overflowX: "hidden",
+});
+
+const closedMixin = (theme: Theme): CSSObject => ({
+  transition: theme.transitions.create("width", {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen,
+  }),
+  overflowX: "hidden",
+  width: `calc(${theme.spacing(7)} + 1px)`,
+  [theme.breakpoints.up("sm")]: {
+    width: `calc(${theme.spacing(8)} + 1px)`,
+  },
+});
+
+export const DrawerHeader = styled("div")(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-end",
+  padding: theme.spacing(0, 1),
+  // necessary for content to be below app bar
+  ...theme.mixins.toolbar,
+}));
+
+interface AppBarProps extends MuiAppBarProps {
+  open?: boolean;
+}
+
+const AppBar = styled(MuiAppBar, {
+  shouldForwardProp: prop => prop !== "open",
+})<AppBarProps>(({ theme, open }) => ({
+  zIndex: theme.zIndex.drawer + 1,
+  transition: theme.transitions.create(["width", "margin"], {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen,
+  }),
+  ...(open && {
+    marginLeft: drawerWidth,
+    width: `calc(100% - ${drawerWidth}px)`,
+    transition: theme.transitions.create(["width", "margin"], {
+      easing: theme.transitions.easing.sharp,
+      duration: theme.transitions.duration.enteringScreen,
+    }),
+  }),
+}));
+
+const Drawer = styled(MuiDrawer, {
+  shouldForwardProp: prop => prop !== "open",
+})(({ theme, open }) => ({
+  width: drawerWidth,
+  flexShrink: 0,
+  whiteSpace: "nowrap",
+  boxSizing: "border-box",
+  ...(open && {
+    ...openedMixin(theme),
+    "& .MuiDrawer-paper": openedMixin(theme),
+  }),
+  ...(!open && {
+    ...closedMixin(theme),
+    "& .MuiDrawer-paper": closedMixin(theme),
+  }),
+}));
+
+export default function RootLayout() {
+  const navigate = useNavigate();
+
+  const { refresh, user } = useAppSelector(state => state.auth);
+  const isPlatformUser = user?.role === "admin" || user?.role === "admin_staff";
+  const isOperationalUser = hasOperationalAccess(user?.role);
+  const { data: organizations } = useGetOrganizationsQuery(undefined, {
+    skip: !isPlatformUser,
+  });
+  const selectedOrganization =
+    localStorage.getItem("cms_organization_id") ?? "";
+  const visibleMenus = React.useMemo(
+    () =>
+      MAIN_MENUS.filter(
+        item => isRole(user?.role) && item.allowedRoles.includes(user.role),
+      ),
+    [user?.role],
+  );
+
+  const [logout, { isSuccess, isError, error }] = useLogoutMutation();
+
+  const [open, setOpen] = React.useState(true);
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [showCalendar, setShowCalendar] = React.useState<boolean>(false);
+
+  const showScheduleCalendar = () => setShowCalendar(true);
+
+  const closeScheduleCalendar = () => setShowCalendar(false);
+
+  const handleDrawerOpen = () => {
+    setOpen(true);
+  };
+
+  const handleDrawerClose = () => {
+    setOpen(false);
+  };
+
+  const [mobileMoreAnchorEl, setMobileMoreAnchorEl] =
+    React.useState<null | HTMLElement>(null);
+
+  const isMenuOpen = Boolean(anchorEl);
+  const isMobileMenuOpen = Boolean(mobileMoreAnchorEl);
+
+  const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMobileMenuClose = () => {
+    setMobileMoreAnchorEl(null);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    handleMobileMenuClose();
+  };
+
+  const handleMobileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setMobileMoreAnchorEl(event.currentTarget);
+  };
+
+  const handleLogout = () => {
+    if (refresh) {
+      logout({ refresh });
+    }
+  };
+
+  React.useEffect(() => {
+    if (isSuccess) {
+      toast.success("Successfully logged out!");
+    }
+  }, [isSuccess]);
+
+  const menuId = "primary-search-account-menu";
+
+  const renderMenu = (
+    <Menu
+      data-testid="user-menu"
+      anchorEl={anchorEl}
+      anchorOrigin={{
+        vertical: "bottom",
+        horizontal: "right",
+      }}
+      id={menuId}
+      keepMounted
+      transformOrigin={{
+        vertical: "top",
+        horizontal: "right",
+      }}
+      open={isMenuOpen}
+      onClose={handleMenuClose}
+    >
+      <MenuItem
+        onClick={() => {
+          handleMenuClose();
+          navigate("/profile");
+        }}
+      >
+        Profile
+      </MenuItem>
+      <MenuItem
+        onClick={() => {
+          handleMenuClose();
+          navigate("/change-password");
+        }}
+      >
+        Change password
+      </MenuItem>
+      <MenuItem onClick={handleLogout}>Logout</MenuItem>
+    </Menu>
+  );
+
+  const mobileMenuId = "primary-search-account-menu-mobile";
+  const renderMobileMenu = (
+    <Menu
+      anchorEl={mobileMoreAnchorEl}
+      anchorOrigin={{
+        vertical: "top",
+        horizontal: "right",
+      }}
+      id={mobileMenuId}
+      keepMounted
+      transformOrigin={{
+        vertical: "top",
+        horizontal: "right",
+      }}
+      open={isMobileMenuOpen}
+      onClose={handleMobileMenuClose}
+    >
+      {isOperationalUser && (
+        <MenuItem>
+          <IconButton
+            size="large"
+            color="inherit"
+            onClick={showScheduleCalendar}
+          >
+            <CalendarMonthIcon />
+          </IconButton>
+        </MenuItem>
+      )}
+      <MenuItem onClick={handleProfileMenuOpen}>
+        <IconButton
+          size="large"
+          aria-label="account of current user"
+          aria-controls="primary-search-account-menu"
+          aria-haspopup="true"
+          color="inherit"
+        >
+          <AccountCircle />
+        </IconButton>
+        <p>Profile</p>
+      </MenuItem>
+    </Menu>
+  );
+
+  return (
+    <Box sx={{ display: "flex" }}>
+      <CssBaseline />
+      <AppBar position="fixed" open={open}>
+        <Toolbar>
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            onClick={handleDrawerOpen}
+            edge="start"
+            sx={{
+              marginRight: 5,
+              ...(open && { display: "none" }),
+            }}
+          >
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="h6" noWrap component="div">
+            Course Management System
+          </Typography>
+          <Box sx={{ flexGrow: 1 }} />
+          <Box sx={{ display: { xs: "none", md: "flex" } }}>
+            {isPlatformUser && (
+              <Select
+                size="small"
+                value={selectedOrganization}
+                displayEmpty
+                aria-label="Active organization"
+                sx={{ minWidth: 180, mr: 1, color: "inherit" }}
+                onChange={event => {
+                  localStorage.setItem(
+                    "cms_organization_id",
+                    String(event.target.value),
+                  );
+                  window.location.reload();
+                }}
+              >
+                <MenuItem value="" disabled>
+                  Select organization
+                </MenuItem>
+                {organizations?.results.map(organization => (
+                  <MenuItem key={organization.id} value={organization.id}>
+                    {organization.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            )}
+            {isOperationalUser && (
+              <IconButton
+                size="large"
+                color="inherit"
+                onClick={showScheduleCalendar}
+              >
+                <CalendarMonthIcon />
+              </IconButton>
+            )}
+            <IconButton
+              data-testid="account-menu-button"
+              size="large"
+              edge="end"
+              aria-label="account of current user"
+              aria-controls={menuId}
+              aria-haspopup="true"
+              onClick={handleProfileMenuOpen}
+              color="inherit"
+            >
+              <AccountCircle />
+            </IconButton>
+          </Box>
+          <Box sx={{ display: { xs: "flex", md: "none" } }}>
+            <IconButton
+              size="large"
+              aria-label="show more"
+              aria-controls={mobileMenuId}
+              aria-haspopup="true"
+              onClick={handleMobileMenuOpen}
+              color="inherit"
+            >
+              <MoreIcon />
+            </IconButton>
+          </Box>
+        </Toolbar>
+      </AppBar>
+      {renderMobileMenu}
+      {renderMenu}
+      <Drawer
+        variant="permanent"
+        open={open}
+        role="presentation"
+        data-testid="nav-drawer"
+      >
+        <DrawerHeader>
+          <IconButton
+            onClick={handleDrawerClose}
+            aria-label="close-menu"
+            data-testid="close-menu"
+          >
+            {open && <ChevronLeftIcon />}
+          </IconButton>
+        </DrawerHeader>
+        <Divider />
+        <List>
+          {visibleMenus.map((item: IMenu) => (
+            <ListItem key={item.path} disablePadding sx={{ display: "block" }}>
+              <ListItemButton
+                sx={{
+                  minHeight: 48,
+                  justifyContent: open ? "initial" : "center",
+                  px: 2.5,
+                }}
+                onClick={() => navigate(item.path)}
+              >
+                <ListItemIcon
+                  sx={{
+                    minWidth: 0,
+                    mr: open ? 3 : "auto",
+                    justifyContent: "center",
+                  }}
+                >
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText
+                  primary={item.label}
+                  sx={{ opacity: open ? 1 : 0 }}
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+      </Drawer>
+      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+        <DrawerHeader />
+
+        {isError && <ErrorDisplay error={error} />}
+
+        <Outlet />
+      </Box>
+
+      {isOperationalUser && (
+        <Modal
+          title="Schedules"
+          open={showCalendar}
+          onClose={closeScheduleCalendar}
+          content={<Calender />}
+          fullScreen
+        />
+      )}
+    </Box>
+  );
+}

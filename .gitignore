@@ -1,0 +1,30 @@
+.vscode
+.idea
+data
+node_modules
+yarn.lock
+backups/
+backend/staticfiles/
+frontend/storybook-static/
+
+# Environment / secrets — NEVER commit these
+.env
+.env.local
+.env.production
+.env.*.local
+*.env
+
+# SQLite databases
+*.sqlite3*
+db.sqlite3*
+*.db
+*.readonly-backup
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Build artifacts
+dist/
+build/

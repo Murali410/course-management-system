@@ -1,0 +1,141 @@
+/* eslint-disable no-empty */
+
+import { apiSlice } from "../api/apiSlice";
+import type { RootState } from "../store";
+import {
+  ITeacher,
+  ITeacherCreateReqData,
+  ITeacherParams,
+  ITeacherUpdateReqData,
+} from "./teacher.type";
+
+export const teacherApi = apiSlice.injectEndpoints({
+  endpoints: builder => ({
+    getTeachers: builder.query<IPaginatedData<ITeacher[]>, ITeacherParams>({
+      query: params => ({
+        url: `/organizations/teachers`,
+        method: "GET",
+        params,
+      }),
+      providesTags: result => {
+        if (result) {
+          return [
+            ...result.results.map(({ id }) => ({
+              type: "Teacher" as const,
+              id,
+            })),
+            "Teacher",
+          ];
+        }
+        return ["Teacher"];
+      },
+    }),
+
+    createTeacher: builder.mutation<ITeacher, ITeacherCreateReqData>({
+      query: (data: ITeacherCreateReqData) => ({
+        url: `/organizations/teachers`,
+        method: "POST",
+        data,
+      }),
+      invalidatesTags: ["OrgStats"],
+
+      // pessimistically update cache
+      async onQueryStarted(_data, { dispatch, queryFulfilled, getState }) {
+        const param = (getState() as RootState).teacher.params;
+
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(
+            teacherApi.util.updateQueryData(
+              "getTeachers",
+              param,
+              (draft: IPaginatedData<ITeacher[]> | undefined) => {
+                if (draft) {
+                  draft.results.unshift({ ...data });
+                }
+              },
+            ),
+          );
+        } catch {}
+      },
+    }),
+
+    updateTeacher: builder.mutation<ITeacher, Partial<ITeacherUpdateReqData>>({
+      query: ({ id, data }: Partial<ITeacherUpdateReqData>) => ({
+        url: `/organizations/teachers/${id}`,
+        method: "PATCH",
+        data,
+      }),
+
+      // pessimistically update cache
+      async onQueryStarted({ id }, { dispatch, queryFulfilled, getState }) {
+        const param = (getState() as RootState).teacher.params;
+
+        try {
+          const { data } = await queryFulfilled;
+
+          dispatch(
+            teacherApi.util.updateQueryData(
+              "getTeachers",
+              param,
+              (draft: IPaginatedData<ITeacher[]> | undefined) => {
+                if (draft) {
+                  const updatedTeacherIndex = draft.results.findIndex(
+                    item => item.id === id,
+                  );
+                  draft.results[updatedTeacherIndex] = { ...data };
+                }
+              },
+            ),
+          );
+        } catch {}
+      },
+    }),
+
+    deleteTeacher: builder.mutation<void, number>({
+      query: (id: number) => ({
+        url: `/organizations/teachers/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["OrgStats"],
+
+      // pessimistically update cache
+      async onQueryStarted(id, { dispatch, queryFulfilled, getState }) {
+        const param = (getState() as RootState).teacher.params;
+
+        try {
+          await queryFulfilled;
+          dispatch(
+            teacherApi.util.updateQueryData(
+              "getTeachers",
+              param,
+              (draft: IPaginatedData<ITeacher[]> | undefined) => {
+                if (draft) {
+                  draft.results = draft.results.filter(
+                    item => Number(item.id) !== id,
+                  );
+                }
+              },
+            ),
+          );
+        } catch {}
+      },
+    }),
+
+    searchTeacher: builder.query<IPaginatedData<ITeacher[]>, undefined>({
+      query: params => ({
+        url: `/organizations/teachers`,
+        method: "GET",
+        params,
+      }),
+      providesTags: ["TeacherSearch"],
+    }),
+  }),
+});
+
+export const {
+  useGetTeachersQuery,
+  useCreateTeacherMutation,
+  useUpdateTeacherMutation,
+  useDeleteTeacherMutation,
+} = teacherApi;
