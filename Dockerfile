@@ -5,7 +5,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never
 WORKDIR /app
-COPY pyproject.toml uv.lock* ./
+COPY backend/pyproject.toml backend/uv.lock* ./
 RUN uv sync --no-dev --no-install-project
 
 FROM python:3.14-slim AS runtime
@@ -19,7 +19,7 @@ RUN addgroup --system app \
 
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
-COPY --chown=app:app . .
+COPY --chown=app:app backend/ .
 RUN mkdir -p /app/staticfiles /app/media \
     && chown -R app:app /app/staticfiles /app/media \
     && chmod +x scripts/*.sh
