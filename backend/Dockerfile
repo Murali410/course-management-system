@@ -20,7 +20,11 @@ RUN addgroup --system app \
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY --chown=app:app . .
-RUN mkdir -p /app/staticfiles /app/media \
+
+RUN if [ -d "backend" ] && [ -f "backend/manage.py" ]; then \
+        cp -rn backend/* . 2>/dev/null || true; \
+    fi \
+    && mkdir -p /app/staticfiles /app/media \
     && chown -R app:app /app/staticfiles /app/media \
     && chmod +x scripts/*.sh
 
